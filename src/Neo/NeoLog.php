@@ -243,9 +243,20 @@ namespace Neo {
 
             NeoLog::$name=$name;
 
-
-            if ( defined('STDIN') && @posix_isatty(STDIN) || $force_console) {
-                NeoLog::initConsoleLogging();
+            if ( defined('STDIN') ) {
+                //try php 7.2 tty check first
+                if ( function_exists("stream_isatty") ) {
+                    if ( stream_isatty(STDIN) || $force_console ) {
+                        NeoLog::initConsoleLogging();
+                    } else {
+                        NeoLog::initFileLogging();
+                    }
+                //fallback to posix otherwise
+                }  else if ( @posix_isatty(STDIN) || $force_console)  {
+                        NeoLog::initConsoleLogging();
+                } else {
+                    NeoLog::initFileLogging();    
+                }
             } else {
                 NeoLog::initFileLogging();
             }
