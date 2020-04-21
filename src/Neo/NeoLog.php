@@ -86,6 +86,7 @@ class NeoIntrospectionProcessor
         static $panic_logfile="";
         static $panic_hook=null;
         static $cleanexit=false;
+	static $quietexit=false;
 
         static $logger=null;
         static $logger_handler=null;
