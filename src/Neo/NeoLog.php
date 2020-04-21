@@ -204,7 +204,7 @@ class NeoIntrospectionProcessor
             //plain logger
             NeoLog::$logger = new NeoLog(NeoLog::$name);
             $handler=new StreamHandler(NeoLog::$logfile, MLogger::DEBUG);
-            $handler->setFormatter( new NeoColoredLineFormatter() );
+            $handler->setFormatter( new ColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
             NeoLog::$logger_handler=$handler;
 
