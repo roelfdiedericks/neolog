@@ -200,13 +200,13 @@ class NeoIntrospectionProcessor
 
 
             //plain logger
-            NeoLog::$logger = new NeoLogger(NeoLog::$name);
+            NeoLog::$logger = new NeoLog(NeoLog::$name);
             $handler=new StreamHandler(NeoLog::$logfile, Logger::DEBUG);
             $handler->setFormatter( new NeoColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
             NeoLog::$logger_handler=$handler;
 
-            NeoLog::$panic_logger = new NeoLogger(NeoLog::$name);
+            NeoLog::$panic_logger = new NeoLog(NeoLog::$name);
             $handler=new StreamHandler(NeoLog::$panic_logfile, Logger::DEBUG);
             NeoLog::$panic_logger->pushHandler($handler);
             NeoLog::$panic_logger_handler=$handler;
@@ -402,15 +402,15 @@ class NeoIntrospectionProcessor
 
         static function mapPearLevel($level) {
             switch ($level) {
-                case PEAR_LOG_INFO   : return NeoLogger::INFO;
-                case PEAR_LOG_DEBUG  : return NeoLogger::DEBUG;
-                case PEAR_LOG_NOTICE : return NeoLogger::NOTICE;
+                case PEAR_LOG_INFO   : return NeoLog::INFO;
+                case PEAR_LOG_DEBUG  : return NeoLog::DEBUG;
+                case PEAR_LOG_NOTICE : return NeoLog::NOTICE;
 
-                case PEAR_LOG_EMERG : return NeoLogger::CRITICAL;
-                case PEAR_LOG_ALERT : return NeoLogger::ALERT;
-                case PEAR_LOG_CRIT  : return NeoLogger::CRITICAL;
-                case PEAR_LOG_ERR   : return NeoLogger::ERROR;
-                case PEAR_LOG_WARNING: return NeoLogger::WARNING;
+                case PEAR_LOG_EMERG : return NeoLog::CRITICAL;
+                case PEAR_LOG_ALERT : return NeoLog::ALERT;
+                case PEAR_LOG_CRIT  : return NeoLog::CRITICAL;
+                case PEAR_LOG_ERR   : return NeoLog::ERROR;
+                case PEAR_LOG_WARNING: return NeoLog::WARNING;
             }
             return DEBUG;
         }
