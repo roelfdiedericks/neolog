@@ -176,7 +176,7 @@ class NeoIntrospectionProcessor
         {
             NeoLog::$console_logging_active=true;
             NeoLog::$logger = new MLogger(NeoLog::$name);
-	    if (defined(STDOUT)) {
+	    if (defined('STDOUT')) {
 		NeoLog::$console_stream=STDOUT;
 		}
             $handler=new StreamHandler(NeoLog::$console_stream, MLogger::DEBUG);
@@ -202,13 +202,13 @@ class NeoIntrospectionProcessor
 
 
             //plain logger
-            NeoLog::$logger = new NeoLog(NeoLog::$name);
+            NeoLog::$logger = new MLogger(NeoLog::$name);
             $handler=new StreamHandler(NeoLog::$logfile, MLogger::DEBUG);
             $handler->setFormatter( new ColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
             NeoLog::$logger_handler=$handler;
 
-            NeoLog::$panic_logger = new NeoLog(NeoLog::$name);
+            NeoLog::$panic_logger = new MLogger(NeoLog::$name);
             $handler=new StreamHandler(NeoLog::$panic_logfile, MLogger::DEBUG);
             NeoLog::$panic_logger->pushHandler($handler);
             NeoLog::$panic_logger_handler=$handler;
@@ -220,7 +220,7 @@ class NeoIntrospectionProcessor
         {
             register_shutdown_function('Neo\NeoLog::shutdownHandler');
             error_reporting(E_ALL);
-            set_error_handler("NeoLog::errorHandler",E_ALL);
+            set_error_handler("\Neo\NeoLog::errorHandler",E_ALL);
         }
 
         static function errorHandler($code, $message, $file, $line)
