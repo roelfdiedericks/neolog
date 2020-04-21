@@ -1,142 +1,12 @@
 <?php
 
-namespace Neo {
+namespace Neo;
 
-    use \Monolog\Logger;
-    use \Monolog\Handler\StreamHandler;
+use Monolog\Logger as MLogger;
+use Monolog\Handler\StreamHandler;
+use \Bramus\Monolog\Formatter\ColoredLineFormatter;
 
-
-    class NeoLogger extends \Monolog\Logger {
-
-        const NOTICE = 250;
-
-        protected static $levels = array(
-                100 => 'DEBUG',
-                200 => 'INFO',
-                250 => 'NOTICE',
-                300 => 'WARNING',
-                400 => 'ERROR',
-                500 => 'CRITICAL',
-                550 => 'ALERT',
-                );
-
-
-        public function __construct($name) {
-            parent::__construct($name);
-
-            //add a "NOTICE" level
-            NeoLogger::$levels[250]='NOTICE';
-        }
-
-        function addRecord($level,$msg, array $context=array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            parent::addRecord($level,$msg,$context);
-        }
-
-        public function addDebug($message, array $context = array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            return $this->addRecord(self::DEBUG, $message, $context);
-        }
-
-        public function addInfo($message, array $context = array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            return $this->addRecord(self::INFO, $message, $context);
-        }
-
-        public function addNotice($message, array $context = array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            return $this->addRecord(self::NOTICE, $message, $context);
-        }
-
-        public function addWarning($message, array $context = array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            return $this->addRecord(self::WARNING, $message, $context);
-        }
-
-        public function addError($message, array $context = array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            return $this->addRecord(self::ERROR, $message, $context);
-        }
-
-        public function addCritical($message, array $context = array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            return $this->addRecord(self::CRITICAL, $message, $context);
-        }
-
-        public function addAlert($message, array $context = array())
-        {
-            if (!is_array($context))
-                $context=array( ''.gettype($context)=>$context);
-            return $this->addRecord(self::ALERT, $message, $context);
-        }
-
-
-        //this should really be standard for Logger
-        public function setLevel($level) {
-            foreach ($this->handlers as $key => $handler) {
-                $handler->setLevel($level);
-            }
-            $this->last_level=$level;
-        }
-
-        public function getLevel() {
-            return $this->handlers[0]->getLevel();
-        }
-
-    }
-
-    class NeoColoredLineFormatter extends \Monolog\Formatter\LineFormatter {
-
-        protected $level_colors = array(
-                100 => "\033[1;34m", //DEBUG = Dark Blue
-                200 => "\033[0;36m", //INFO = Light Blue
-                250 => "\033[1;36m", //NOTICE = Cyan
-                300 => "\033[1;33m", //WARNING = Yellow
-                400 => "\033[1;31m", //ERROR = Light Red
-                500 => "\033[0;37m\033[1;41m", //CRITICAL = Light Red Background, white text
-                550 => "\033[1;33m\033[1;41m", //ALERT = blinkenlichten
-                );
-        protected $color_off="\033[0m";
-
-        public function __construct($format = null, $dateFormat = null)
-        {
-            if (empty($format))
-                $format="[%datetime%] %channel%.%level_name%: %message% %context% trace:%extra%";
-            parent::__construct($format, $dateFormat,true);
-        }
-
-        public function format(array $record)
-        {
-            $context=$record['context'];
-            $record['context']=array();
-            $output=parent::format($record);
-            //$output=print_r($record,true);
-            $color=@$this->level_colors[$record['level']];
-            $output=str_replace('trace:[]','',trim($output));
-            $output=str_replace('[]','',trim($output));
-            if (!empty($context))
-                $context=print_r($context,true);
-            else
-                $context="";
-            return  $color . $output . " $context " . $this->color_off . "\n";
-        }
-    }
-
-    class NeoIntrospectionProcessor
+class NeoIntrospectionProcessor
     {
         /**
          * @param array $record
@@ -206,6 +76,7 @@ namespace Neo {
         }
     }
 
+
     class NeoLog {
 
         static $name='unknown';
@@ -236,7 +107,7 @@ namespace Neo {
 
 
 
-        static function init($name,$logdir='',$force_console=false,$level=Logger::WARNING)
+        static function init($name,$logdir='',$force_console=false,$level=MLogger::WARNING)
         {
             if (!empty($logdir))
                 NeoLog::$logdir=$logdir;
@@ -277,11 +148,6 @@ namespace Neo {
 
         }
 
-        static public function exitCleanly($msg,$context) {
-            NeoLog::$cleanexit=true;
-            NeoLog::$logger->addNotice($msg,$context);
-        }
-
         static function enableIntrospection() {
             $processor=new NeoIntrospectionProcessor();
 
@@ -298,19 +164,27 @@ namespace Neo {
                 NeoLog::$panic_logger_handler->popProcessor();
         }
 
+
+        static public function exitCleanly($msg,$context) {
+            NeoLog::$cleanexit=true;
+            NeoLog::$logger->addNotice($msg,$context);
+        }
+
+        
+
         static function initConsoleLogging()
         {
             NeoLog::$console_logging_active=true;
-            NeoLog::$logger = new NeoLogger(NeoLog::$name);
+            NeoLog::$logger = new MLogger(NeoLog::$name);
 
-            $handler=new StreamHandler(NeoLog::$console_stream, Logger::DEBUG);
-            $handler->setFormatter( new NeoColoredLineFormatter() );
+            $handler=new StreamHandler(NeoLog::$console_stream, MLogger::DEBUG);
+            $handler->setFormatter( new ColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
             NeoLog::$logger_handler=$handler;
 
             NeoLog::$panic_logger=NeoLog::$logger;
 
-            NeoLog::enableIntrospection();
+            //NeoLog::enableIntrospection();
         }
 
         static function initFileLogging()
@@ -337,14 +211,14 @@ namespace Neo {
             NeoLog::$panic_logger->pushHandler($handler);
             NeoLog::$panic_logger_handler=$handler;
 
-            NeoLog::enableIntrospection();
+            //NeoLog::enableIntrospection();
         }
 
         static function initErrorHandlers()
         {
-            register_shutdown_function('\Neo\NeoLog::shutdownHandler');
+            register_shutdown_function('Neo\NeoLog::shutdownHandler');
             error_reporting(E_ALL);
-            set_error_handler("\Neo\NeoLog::errorHandler",E_ALL);
+            set_error_handler("NeoLog::errorHandler",E_ALL);
         }
 
         static function errorHandler($code, $message, $file, $line)
@@ -360,25 +234,25 @@ namespace Neo {
             switch ($code) {
                 case E_WARNING:
                 case E_USER_WARNING:
-                    $priority = NeoLogger::WARNING;
+                    $priority = self::WARNING;
                     break;
                 case E_NOTICE:
                 case E_USER_NOTICE:
-                    $priority = NeoLogger::WARNING; //map to warning, so we get ppl to fix their code
+                    $priority = self::WARNING; //map to warning, so we get ppl to fix their code
                     //undefined variables or indexes we thunk to INFO level
                     if (preg_match("/Undefined variable/",$message) || preg_match("/Undefined index/",$message)) {
-                        $priority = NeoLogger::INFO;
+                        $priority = self::INFO;
                     }
                     break;
                 case E_ERROR:
                 case E_USER_ERROR:
-                    $priority = NeoLogger::ERROR;
+                    $priority = self::ERROR;
                     break;
                 case E_DEPRECATED:
-                    $priority=NeoLogger::DEBUG;
+                    $priority=self::DEBUG;
                     break;
                 default:
-                    $priority = NeoLogger::INFO;
+                    $priority = self::INFO;
             }
 
             $l="($message) in $file at line $line";
@@ -452,8 +326,10 @@ namespace Neo {
         {
             NeoLog::$panic_hook=$callback_panic_hook;
         }
+
         static function setLevel($level) {
-            NeoLog::$logger->setLevel($level);
+            //todo: somehow fix this
+            //NeoLog::$logger->setLevel($level);
         }
 
         static function getLevel() {
@@ -477,37 +353,51 @@ namespace Neo {
 
         static function debug($msg,$context=array())
         {
-            NeoLog::$logger->addDebug($msg,$context);
+            if (!is_array($context))
+            $context=array( ''.gettype($context)=>$context);
+            return NeoLog::$logger->debug($msg, $context);
         }
 
         static function info($msg,$context=array())
         {
-            NeoLog::$logger->addInfo($msg,$context);
+            if (!is_array($context))
+            $context=array( ''.gettype($context)=>$context);
+            return NeoLog::$logger->info($msg, $context);
         }
 
         static function notice($msg,$context=array())
         {
-            NeoLog::$logger->addNotice($msg,$context);
+            if (!is_array($context))
+            $context=array( ''.gettype($context)=>$context);
+            return NeoLog::$logger->notice($msg, $context);
         }
 
         static function warning($msg,$context=array())
         {
-            NeoLog::$logger->addWarning($msg,$context);
+            if (!is_array($context))
+            $context=array( ''.gettype($context)=>$context);
+            return NeoLog::$logger->warning($msg, $context);
         }
 
         static function error($msg,$context=array())
         {
-            NeoLog::$logger->addError($msg,$context);
+            if (!is_array($context))
+            $context=array( ''.gettype($context)=>$context);
+            return NeoLog::$logger->error($msg, $context);
         }
 
         static function critical($msg,$context=array())
         {
-            NeoLog::$logger->addCritical($msg,$context);
+            if (!is_array($context))
+            $context=array( ''.gettype($context)=>$context);
+            return NeoLog::$logger->addRecord(self::CRITICAL, $msg, $context);
         }
 
         static function alert($msg,$context=array())
         {
-            NeoLog::$logger->addAlert($msg,$context);
+            if (!is_array($context))
+            $context=array( ''.gettype($context)=>$context);
+            return NeoLog::$logger->addRecord(self::ALERT, $msg, $context);
         }
 
         static function mapPearLevel($level) {
@@ -528,263 +418,4 @@ namespace Neo {
     }
 
 
-} //namespace Neo;
-
-namespace {
-    use Neo\NeoLog;
-
-
-    function l_debug($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addDebug($msg,$context);
-    }
-
-    function l_hex($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addInfo("\n" . hex_dump($msg),$context);
-    }
-
-    function l_info($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addInfo($msg,$context);
-    }
-
-    function l_notice($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addNotice($msg,$context);
-    }
-
-    function l_warning($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addWarning($msg,$context);
-    }
-
-    function l_warn($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addWarning($msg,$context);
-    }
-
-    function l_error($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addError($msg,$context);
-    }
-    function l_err($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addError($msg,$context);
-    }
-
-    function l_critical($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addCritical($msg,$context);
-    }
-    function l_crit($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addCritical($msg,$context);
-    }
-
-    function l_alert($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::$logger->addAlert($msg,$context);
-    }
-
-    function l_panic($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::panic($msg,$context);
-    }
-
-    //log a message, and exit cleanly
-    function l_exit($msg,$context=array())
-    {
-        if (!is_array($context))
-            $context=array( ''.gettype($context)=>$context);
-        NeoLog::exitCleanly($msg,$context);
-    }
-
-    function l_print_r($var,$context=array()) {
-        l_debug("\n".print_r($var,true),$context);
-    }
-
-    //maintain some pear_ backward compatible constants
-
-
-    function msg($msg,$level=PEAR_LOG_DEBUG,$method="",$function="") {
-        global $logger;
-        $fn_sig="";
-        if ($method!="")
-            $fn_sig="$method:";
-        if ($function!="")
-            $fn_sig="$method::$function:";
-        NeoLog::log(NeoLog::mapPearLevel($level),"{$fn_sig}{$msg}");
-    }
-
-    function msg_r($var,$level=PEAR_LOG_DEBUG,$method="",$function="") {
-        global $logger;
-        $fn_sig="";
-        if ($method!="")
-            $fn_sig="$method:";
-        if ($function!="")
-            $fn_sig="$method::$function:";
-
-        NeoLog::log(NeoLog::mapPearLevel($level), "{$fn_sig}msg_r:\n" . print_r($var,true));
-    }
-
-    function msg_raddump($var,$level=PEAR_LOG_DEBUG,$method="",$function="") {
-        global $logger;
-        $fn_sig="";
-        if ($method!="")
-            $fn_sig="$method:";
-        if ($function!="")
-            $fn_sig="$method::$function:";
-
-        $tmp=$var;
-        if (is_array($var)) {
-            unset($tmp['_full']);
-        }
-
-        NeoLog::log(NeoLog::mapPearLevel($level), "{$fn_sig}:msg_raddump:\n" . print_r($tmp,true));
-    }
-
-    function panic($msg,$level=PEAR_LOG_ALERT,$method="",$function="") {
-        global $panic_logger;
-        $fn_sig="";
-        if ($method!="")
-            $fn_sig="$method:";
-        if ($function!="")
-            $fn_sig="$method::$function:";
-
-        if (NeoLog::$panic_logger) {
-            NeoLog::panic_log(NeoLog::mapPearLevel($level),"{$fn_sig}{$msg}");
-        } else {
-            fprintf(STDERR,"***PANIC**:{$fn_sig}{$msg}");
-        }
-    }
-
-    function panic_r($var,$level=PEAR_LOG_ALERT,$method="",$function="") {
-        global $panic_logger;
-        $fn_sig="";
-        if ($method!="")
-            $fn_sig="$method:";
-        if ($function!="")
-            $fn_sig="$method::$function:";
-
-        if (NeoLog::$panic_logger) {
-            NeoLog::panic_log(NeoLog::mapPearLevel($level),"{$fn_sig}panic_r:\n" . print_r($var,true));
-        } else {
-            fprintf(STDERR,"***PANIC**:{$fn_sig}panic_r:\n" . print_r($var,true));
-        }
-    }
-
-    function neo_adodb_msg($msg,$newline=true) {
-        global $logger;
-        $msg=str_replace("-----<hr>\n","",$msg);
-        $msg=str_replace("-----<hr>","",$msg);
-        $msg=trim($msg);
-        $m="ADODB: $msg" . ($newline ? "\n" : "");
-        NeoLog::$logger->addDebug($m);
-    }
-
-
-    function hex_print($data, $newline="\n")
-    {
-        static $from = '';
-        static $to = '';
-
-        static $width = 16; # number of bytes per line
-
-            static $pad = '.'; # padding for non-visible characters
-
-            if ($from==='')
-            {
-                for ($i=0; $i<=0xFF; $i++)
-                {
-                    $from .= chr($i);
-                    $to .= ($i >= 0x20 && $i <= 0x7E) ? chr($i) : $pad;
-                }
-            }
-
-        $hex = str_split(bin2hex($data), $width*2);
-        $chars = str_split(strtr($data, $from, $to), $width);
-
-        $offset = 0;
-        foreach ($hex as $i => $line)
-        {
-            echo sprintf('%6X',$offset).' : '.implode(' ', str_split($line,2)) . ' [' . $chars[$i] . ']' . $newline;
-            $offset += $width;
-        }
-    }
-
-    function hex_dump($data, $newline="\n")
-    {
-        static $from = '';
-        static $to = '';
-
-        static $width = 16; # number of bytes per line
-
-            static $pad = '.'; # padding for non-visible characters
-
-            if ($from==='')
-            {
-                for ($i=0; $i<=0xFF; $i++)
-                {
-                    $from .= chr($i);
-                    $to .= ($i >= 0x20 && $i <= 0x7E) ? chr($i) : $pad;
-                }
-            }
-
-        $hex = str_split(bin2hex($data), $width*2);
-        $chars = str_split(strtr($data, $from, $to), $width);
-
-        $offset = 0;
-        $r="";
-        foreach ($hex as $i => $line)
-        {
-            $r.=sprintf('%6X',$offset).' : '.implode(' ', str_split($line,2)) . ' [' . $chars[$i] . ']' . $newline;
-            $offset += $width;
-        }
-        return $r;
-    }
-
-    function str_hex($string)
-    {
-        $hex='';
-        for ($i=0; $i < strlen($string); $i++)
-        {
-            $hex .= dechex(ord($string[$i]));
-        }
-        return $hex;
-    }
-
-    function hex_str($hex){
-        $string='';
-        for ($i=0; $i < strlen($hex)-1; $i+=2){
-            $string .= chr(hexdec($hex[$i].$hex[$i+1]));
-        }
-        return $string;
-    }
-}
-
-
+include_once(__DIR__ . "/neo_globals.php");
