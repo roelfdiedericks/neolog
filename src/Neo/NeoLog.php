@@ -203,13 +203,13 @@ class NeoIntrospectionProcessor
 
             //plain logger
             NeoLog::$logger = new NeoLog(NeoLog::$name);
-            $handler=new StreamHandler(NeoLog::$logfile, Logger::DEBUG);
+            $handler=new StreamHandler(NeoLog::$logfile, MLogger::DEBUG);
             $handler->setFormatter( new NeoColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
             NeoLog::$logger_handler=$handler;
 
             NeoLog::$panic_logger = new NeoLog(NeoLog::$name);
-            $handler=new StreamHandler(NeoLog::$panic_logfile, Logger::DEBUG);
+            $handler=new StreamHandler(NeoLog::$panic_logfile, MLogger::DEBUG);
             NeoLog::$panic_logger->pushHandler($handler);
             NeoLog::$panic_logger_handler=$handler;
 
