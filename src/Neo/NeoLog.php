@@ -95,7 +95,7 @@ class NeoIntrospectionProcessor
 
         static $console_logging_active=false;
         static $file_logging_active=false;
-        static $console_stream=STDOUT;
+        static $console_stream=null;
 
         const DEBUG = 100;
         const INFO = 200;
@@ -176,7 +176,9 @@ class NeoIntrospectionProcessor
         {
             NeoLog::$console_logging_active=true;
             NeoLog::$logger = new MLogger(NeoLog::$name);
-
+	    if (defined(STDOUT)) {
+		NeoLog::$console_stream=STDOUT;
+		}
             $handler=new StreamHandler(NeoLog::$console_stream, MLogger::DEBUG);
             $handler->setFormatter( new ColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
