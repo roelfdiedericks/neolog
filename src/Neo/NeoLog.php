@@ -97,6 +97,7 @@ class NeoIntrospectionProcessor
         static $console_logging_active=false;
         static $file_logging_active=false;
         static $console_stream=null;
+        static $level=MLogger::DEBUG;
 
         const DEBUG = 100;
         const INFO = 200;
@@ -114,6 +115,7 @@ class NeoIntrospectionProcessor
                 NeoLog::$logdir=$logdir;
 
             NeoLog::$name=$name;
+            NeoLog::$level=$level;
 
             if ( defined('STDIN') ) {
                 //try php 7.2 tty check first
@@ -180,7 +182,7 @@ class NeoIntrospectionProcessor
 	    if (defined('STDOUT')) {
 		NeoLog::$console_stream=STDOUT;
 		}
-            $handler=new StreamHandler(NeoLog::$console_stream, MLogger::DEBUG);
+            $handler=new StreamHandler(NeoLog::$console_stream, NeoLog::$level);
             $handler->setFormatter( new ColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
             NeoLog::$logger_handler=$handler;
@@ -204,7 +206,7 @@ class NeoIntrospectionProcessor
 
             //plain logger
             NeoLog::$logger = new MLogger(NeoLog::$name);
-            $handler=new StreamHandler(NeoLog::$logfile, MLogger::DEBUG);
+            $handler=new StreamHandler(NeoLog::$logfile, NeoLog::$level);
             $handler->setFormatter( new ColoredLineFormatter() );
             NeoLog::$logger->pushHandler($handler);
             NeoLog::$logger_handler=$handler;
