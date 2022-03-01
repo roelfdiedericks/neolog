@@ -213,7 +213,7 @@ function neo_str_hex($string)
     $hex='';
     for ($i=0; $i < strlen($string); $i++)
     {
-        $hex .= dechex(ord($string[$i]));
+        $hex .= str_pad(dechex(ord($string[$i])),2,'0',STR_PAD_LEFT);
     }
     return $hex;
 }
