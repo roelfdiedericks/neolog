@@ -14,8 +14,6 @@
         }
     ],
     "require": {
-        "monolog/monolog": "dev-main",
-        "bramus/monolog-colored-line-formatter": "dev-master"
     },
     "autoload": {
         "psr-4": {"Neo\\": "src/Neo"}
