@@ -14,7 +14,7 @@
         }
     ],
     "require": {
-        "monolog/monolog": "dev-master",
+        "monolog/monolog": "dev-main",
         "bramus/monolog-colored-line-formatter": "dev-master"
     },
     "autoload": {
