@@ -144,7 +144,7 @@ function neo_adodb_msg($msg,$newline=true) {
     $msg=str_replace("-----<hr>","",$msg);
     $msg=trim($msg);
     $m="ADODB: $msg" . ($newline ? "\n" : "");
-    \Neo\NeoLog::$logger->addDebug($m);
+    l_debug($m);
 }
 
 
@@ -213,7 +213,7 @@ function neo_str_hex($string)
     $hex='';
     for ($i=0; $i < strlen($string); $i++)
     {
-        $hex .= str_pad(dechex(ord($string[$i])),2,'0',STR_PAD_LEFT);
+        $hex .= dechex(ord($string[$i]));
     }
     return $hex;
 }

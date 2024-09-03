@@ -1,81 +1,5 @@
 <?php
-
 namespace Neo;
-
-use Monolog\Logger as MLogger;
-use Monolog\Handler\StreamHandler;
-use \Bramus\Monolog\Formatter\ColoredLineFormatter;
-
-class NeoIntrospectionProcessor
-    {
-        /**
-         * @param array $record
-         * @return array
-         */
-        public function __invoke(array $record)
-        {
-
-            //don't bother backtracing if we're not at debug, or info level
-            //if ( NeoLog::getLevel()>NeoLog::INFO ) {
-            //return $record;
-            //}
-
-            $trace = debug_backtrace();
-
-            // skip first since it's always the current method
-            array_shift($trace);
-            // the call_user_func call is also skipped
-            array_shift($trace);
-
-            $i = 0; $stop=0;
-            while ( isset($trace[$i]['class']) && !$stop ) {
-                if (
-                        preg_match('/Monolog\\\/',$trace[$i]['class']) ||
-                        preg_match('/Neo\\\NeoLog/',$trace[$i]['class'])  ||
-                        preg_match('/ADOConnection/',$trace[$i]['class'])
-                   ) {
-                    //echo "$i= {$trace[$i]['class']} \n";
-                    $i++;
-                } else {
-                    $stop=1;
-                }
-            }
-
-            //special for adodb
-            while ( isset($trace[$i+1]) &&  isset($trace[$i+1]['class']) && ( @$trace[$i+1]['class']=="ADOConnection" || @$trace[$i+1]['function']=="_adodb_debug_execute" )) {
-                $i++;
-            }
-
-            // we should have a proper call source now
-            $backtrace=array(
-                    'file'      => isset($trace[$i]['file']) ? $trace[$i]['file'] : null,
-                    'line'      => isset($trace[$i]['line']) ? $trace[$i]['line'] : null,
-                    'class'     => isset($trace[$i+1]['class']) ? $trace[$i+1]['class'] : null,
-                    'function'  => isset($trace[$i+1]['function']) ? $trace[$i+1]['function'] : null,
-                    );
-
-            //if we're on debug level, add the 'extra' array
-            if (NeoLog::getLevel()<=NeoLog::DEBUG) {
-                $record['extra'] = array_merge(
-                        $record['extra'],
-                        $backtrace
-                        );
-            }
-
-            //if we're on info level, just add the method/class to the message
-            //if (NeoLog::getLevel()<=NeoLog::INFO) {
-            if ( isset($backtrace['class']) ) {
-
-                $record['message']="({$backtrace['class']}::{$backtrace['function']}) {$record['message']}";
-            } else if ( isset($backtrace['function']) )  {
-                $record['message']="({$backtrace['function']}) {$record['message']}";
-            }
-            //}
-
-            return $record;
-        }
-    }
-
 
     class NeoLog {
 
@@ -86,18 +10,14 @@ class NeoIntrospectionProcessor
         static $panic_logfile="";
         static $panic_hook=null;
         static $cleanexit=false;
-	static $quietexit=false;
-
-        static $logger=null;
-        static $logger_handler=null;
-
-        static $panic_logger=null;
-        static $panic_logger_handler=null;
+	    static $quietexit=false;
 
         static $console_logging_active=false;
         static $file_logging_active=false;
         static $console_stream=null;
-        static $level=MLogger::DEBUG;
+        static $logstream=null;
+        static $panicstream=null;
+        static $level=100;
 
         const DEBUG = 100;
         const INFO = 200;
@@ -109,7 +29,7 @@ class NeoIntrospectionProcessor
 
 
 
-        static function init($name,$logdir='',$force_console=false,$level=MLogger::WARNING)
+        static function init($name,$logdir='',$force_console=false,$level=NeoLog::INFO)
         {
             if (!empty($logdir))
                 NeoLog::$logdir=$logdir;
@@ -154,23 +74,26 @@ class NeoIntrospectionProcessor
         static function enableIntrospection() {
             $processor=new NeoIntrospectionProcessor();
 
-            if (NeoLog::$logger_handler)
+            /* if (NeoLog::$logger_handler)
                 NeoLog::$logger_handler->pushProcessor($processor);
             if (NeoLog::$panic_logger_handler)
                 NeoLog::$panic_logger_handler->pushProcessor($processor);
+            */
         }
 
         static function disableIntrospection($handler) {
+            /*
             if (NeoLog::$logger_handler)
                 NeoLog::$logger_handler->popProcessor();
             if (NeoLog::$panic_logger_handler)
                 NeoLog::$panic_logger_handler->popProcessor();
+            */
         }
 
 
         static public function exitCleanly($msg,$context) {
             NeoLog::$cleanexit=true;
-            NeoLog::$logger->addNotice($msg,$context);
+            l_notice($msg,$context);
         }
 
         
@@ -178,22 +101,20 @@ class NeoIntrospectionProcessor
         static function initConsoleLogging()
         {
             NeoLog::$console_logging_active=true;
-            NeoLog::$logger = new MLogger(NeoLog::$name);
-	    if (defined('STDOUT')) {
-		NeoLog::$console_stream=STDOUT;
-		}
-            $handler=new StreamHandler(NeoLog::$console_stream, NeoLog::$level);
-            $handler->setFormatter( new ColoredLineFormatter() );
-            NeoLog::$logger->pushHandler($handler);
-            NeoLog::$logger_handler=$handler;
+            NeoLog::$console_stream='php://stdout';
+            NeoLog::$logstream=fopen(NeoLog::$console_stream,'a');
 
-            NeoLog::$panic_logger=NeoLog::$logger;
+            NeoLog::$panicstream=NeoLog::$logstream;
 
-            //NeoLog::enableIntrospection();
         }
 
         static function initFileLogging()
         {
+            if (function_exists('\neo_initFileLogging')) {
+                \neo_initFileLogging();
+                return;
+            }
+
 
             NeoLog::$file_logging_active=true;
             NeoLog::$panic_logfile=NeoLog::$logdir.'/panic.log';
@@ -204,19 +125,23 @@ class NeoIntrospectionProcessor
             }
 
 
-            //plain logger
-            NeoLog::$logger = new MLogger(NeoLog::$name);
-            $handler=new StreamHandler(NeoLog::$logfile, NeoLog::$level);
-            $handler->setFormatter( new ColoredLineFormatter() );
-            NeoLog::$logger->pushHandler($handler);
-            NeoLog::$logger_handler=$handler;
+            //plain stream logger
+            try { 
+                $stream=fopen(NeoLog::$logfile, 'a');
+                if (!is_resource($stream)) {
+                    throw new \Exception("unable to open logfile " . NeoLog::$logfile ." for append");
+                }
+            } catch(\Exception $e) {
+                throw new \Exception($e);
+            }
+            NeoLog::$logstream=$stream;
 
-            NeoLog::$panic_logger = new MLogger(NeoLog::$name);
-            $handler=new StreamHandler(NeoLog::$panic_logfile, MLogger::DEBUG);
-            NeoLog::$panic_logger->pushHandler($handler);
-            NeoLog::$panic_logger_handler=$handler;
+            $panicstream=fopen(NeoLog::$panic_logfile, 'a');
+            if (!is_resource($panicstream)) {
+                throw new \Exception("unable to open logfile " . NeoLog::$panic_logfile ." for append");
+            }
+            NeoLog::$panicstream=$stream;
 
-            //NeoLog::enableIntrospection();
         }
 
         static function initErrorHandlers()
@@ -228,7 +153,7 @@ class NeoIntrospectionProcessor
 
         static function errorHandler($code, $message, $file, $line)
         {
-            global $logger,$module_name;
+            global $module_name;
 
             //Ignore stuff supressed by the @ operator
             if (!error_reporting())
@@ -240,13 +165,47 @@ class NeoIntrospectionProcessor
                 case E_WARNING:
                 case E_USER_WARNING:
                     $priority = self::WARNING;
+                    if (
+                        preg_match("/twitterIntents.php/",$file) 
+                        || preg_match("/templates_c/",$file) 
+                        || preg_match("/templates_c/",$file) 
+                        || preg_match("/HTMLPurifier.*/",$message) 
+                        || ( preg_match("/Invalid argument supplied for foreach/",$message) && preg_match("/cart.php/",$file) )
+                        || ( preg_match("/expects parameter 1 to be string, array given/",$message) && preg_match("/lib\/Admin.php/",$file) )
+                        || ( preg_match("/expects parameter 1 to be string, object given/",$message) && preg_match("/Module\/Widget.php/",$file) )
+                        || ( preg_match("/ Unable to find the wrapper &quot;tcp&quot;/",$message) && preg_match("/Environment\/Php.php/",$file) )
+                        || preg_match("/Constant CLIENTAREA already defined/",$message)
+                        || preg_match("/Undefined property: stdClass::.contact_country/",$message)
+                    ) {
+                        //only squelch to debug in production
+                        if (defined('ENVIRONMENT') && (ENVIRONMENT=='production')) {
+                            $priority = self::DEBUG;
+                        } else {
+                            $priority = self::INFO;
+                        }
+                    }
                     break;
                 case E_NOTICE:
                 case E_USER_NOTICE:
                     $priority = self::WARNING; //map to warning, so we get ppl to fix their code
-                    //undefined variables or indexes we thunk to INFO level
-                    if (preg_match("/Undefined variable/",$message) || preg_match("/Undefined index/",$message)) {
-                        $priority = self::INFO;
+                    //undefined variables or indexes we thunk to DEBUG level
+                    if (
+                        preg_match("/Undefined variable/",$message) 
+                        || preg_match("/Undefined index/",$message)
+                        || ( preg_match("/Uninitialized string offset:0/",$message) && preg_match("/cart.php/",$file) )
+                        || ( preg_match("/Invalid argument supplied for foreach/",$message) )
+                        || preg_match("/Undefined offset:/",$message)
+                        || preg_match("/Uninitialized string offset:/",$message)
+                        || preg_match("/Trying to get property 'value' of non-object/",$message)
+                        || preg_match("/Constant CLIENTAREA already defined/",$message)
+                        || preg_match("/Undefined property: stdClass::.contact_country/",$message)
+                    ) {
+                        //only squelch to debug in production
+                        if (defined('ENVIRONMENT') && (ENVIRONMENT=='production')) {
+                            $priority = self::DEBUG;
+                        } else {
+                            $priority = self::INFO;
+                        }
                     }
                     break;
                 case E_ERROR:
@@ -261,10 +220,10 @@ class NeoIntrospectionProcessor
             }
 
             $l="($message) in $file at line $line";
-            if (NeoLog::$logger)  {
-                NeoLog::$logger->addRecord($priority,$l);
+            if (NeoLog::$logstream)  {
+                NeoLog::log($priority,$l);
             } else {
-                fprintf(STDERR,"(no logger)" . $l );
+                fprintf("php://stderr","(no stream)" . $l );
             }
         }
 
@@ -333,76 +292,115 @@ class NeoIntrospectionProcessor
         }
 
         static function setLevel($level) {
-            //todo: somehow fix this
-            //NeoLog::$logger->setLevel($level);
+            NeoLog::$level=$level;
         }
 
         static function getLevel() {
-            return NeoLog::$logger->getLevel();
+            return NeoLog::$level;
+        }
+
+        static function ansi_color($color) {
+            $s="\033";
+            switch ($color) {
+                case 'RED'     : $s.="[31m"; break;
+                case 'GREEN'   : $s.="[32m"; break;
+                case 'YELLOW'  : $s.="[33m"; break;
+                case 'BLUE'    : $s.="[34m"; break;
+                case 'MAGENTA' : $s.="[35m"; break;
+                case 'CYAN'    : $s.="[36m"; break;
+                case 'WHITE'   : $s.="[37m"; break;
+                default        : $s.="[37m"; break;
+            }
+            return $s;
+        }
+
+        static function ansi_close() {    
+            return "\033"."[0m";
+        }
+
+        static function format_message($level,$msg,$context=array()) {
+            $prefix="UNKNOWN";
+            $color="WHITE";
+            switch($level) {
+                case NeoLog::DEBUG    : { $prefix="DEBUG";    $color="WHITE";  break; }
+                case NeoLog::INFO     : { $prefix="INFO";     $color="GREEN";   break; }
+                case NeoLog::NOTICE   : { $prefix="NOTICE";   $color="CYAN";   break; }
+                case NeoLog::WARNING  : { $prefix="WARNING";  $color="YELLOW"; break; }
+                case NeoLog::ERROR    : { $prefix="ERROR";    $color="RED"; break; }
+                case NeoLog::CRITICAL : { $prefix="CRITICAL"; $color="RED";  break; }
+                case NeoLog::ALERT    : { $prefix="ALERT";    $color="RED"; break; }
+            }
+            $date=date("Y-m-d H:i:s");
+            $cont=json_encode($context);
+            $context2=array();
+            $cont2=json_encode($context2);
+            return NeoLog::ansi_color($color) . "[{$date}] " . NeoLog::$name . ".{$prefix}: $msg {$cont} {$cont2}" . NeoLog::ansi_close() . "\n";
         }
 
         static function log($level,$msg,$context=array())
         {
-            NeoLog::$logger->addRecord($level,$msg,$context);
+            if ($level>=NeoLog::$level) {
+                fputs(NeoLog::$logstream, NeoLog::format_message($level,$msg,$context));
+            }
         }
 
         static function panic_log($level,$msg,$context=array())
         {
-            NeoLog::$logger->addRecord($level,"**PANIC**:$msg",$context);
-            NeoLog::$panic_logger->addRecord($level,"**PANIC**:$msg",$context);
+            fputs(NeoLog::$logstream, NeoLog::format_message($level,"**PANIC**:$msg",$context));
+            fputs(NeoLog::$panicstream, NeoLog::format_message($level,"**PANIC**:$msg",$context));
         }
 
         static function panic($msg,$context=array()) {
-            NeoLog::panic_log(self::ALERT,$msg,$context);
+            NeoLog::panic_log(NeoLog::ALERT,$msg,$context);
         }
 
         static function debug($msg,$context=array())
         {
             if (!is_array($context))
             $context=array( ''.gettype($context)=>$context);
-            return NeoLog::$logger->debug($msg, $context);
+            return NeoLog::log(NeoLog::DEBUG,$msg, $context);
         }
 
         static function info($msg,$context=array())
         {
             if (!is_array($context))
             $context=array( ''.gettype($context)=>$context);
-            return NeoLog::$logger->info($msg, $context);
+            return NeoLog::log(NeoLog::INFO,$msg, $context);
         }
 
         static function notice($msg,$context=array())
         {
             if (!is_array($context))
             $context=array( ''.gettype($context)=>$context);
-            return NeoLog::$logger->notice($msg, $context);
+            return NeoLog::log(NeoLog::NOTICE,$msg, $context);
         }
 
         static function warning($msg,$context=array())
         {
             if (!is_array($context))
             $context=array( ''.gettype($context)=>$context);
-            return NeoLog::$logger->warning($msg, $context);
+            return NeoLog::log(NeoLog::WARNING,$msg, $context);
         }
 
         static function error($msg,$context=array())
         {
             if (!is_array($context))
             $context=array( ''.gettype($context)=>$context);
-            return NeoLog::$logger->error($msg, $context);
+            return NeoLog::log(NeoLog::ERROR,$msg, $context);
         }
 
         static function critical($msg,$context=array())
         {
             if (!is_array($context))
             $context=array( ''.gettype($context)=>$context);
-            return NeoLog::$logger->addRecord(self::CRITICAL, $msg, $context);
+            return NeoLog::log(NeoLog::CRITICAL,$msg, $context);
         }
 
         static function alert($msg,$context=array())
         {
             if (!is_array($context))
             $context=array( ''.gettype($context)=>$context);
-            return NeoLog::$logger->addRecord(self::ALERT, $msg, $context);
+            return NeoLog::log(NeoLog::ALERT,$msg, $context);
         }
 
         static function mapPearLevel($level) {
